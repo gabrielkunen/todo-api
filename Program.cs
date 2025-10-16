@@ -1,4 +1,4 @@
-using Microsoft.Data.SqlClient;
+using Npgsql;
 using TodoApi.Dto;
 using TodoApi.Entidades;
 
@@ -19,12 +19,12 @@ app.MapPost("/usuarios", (CriarUsuarioRequest request) =>
         var senhaCriptografa = BCrypt.Net.BCrypt.HashPassword(request.Senha);
         var usuario = new Usuario(request.Email, senhaCriptografa, request.Nome);
 
-        var connectionString = "";
-        using var con = new SqlConnection(connectionString);
+        var connectionString = "Host=localhost;Port=10400;Username=user;Password=senha123;Database=todoapi";
+        using var con = new NpgsqlConnection(connectionString);
         
         var sql = "INSERT INTO USUARIOS(EMAIL, SENHA, NOME) VALUES (@email, @senha, @nome)";
         
-        SqlCommand command = new(sql, con);
+        NpgsqlCommand command = new(sql, con);
         command.Parameters.AddWithValue("@email", usuario.Email);
         command.Parameters.AddWithValue("@senha", usuario.Senha);
         command.Parameters.AddWithValue("@nome", usuario.Nome);

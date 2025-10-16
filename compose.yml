@@ -1,0 +1,13 @@
+services:
+  db:
+    image: postgres:latest
+    container_name: todo-api-db
+    restart: always
+    volumes:
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    ports:
+      - "10400:5432"
+    environment:
+      - POSTGRES_USER=user
+      - POSTGRES_PASSWORD=senha123
+      - POSTGRES_DB=todoapi
