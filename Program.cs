@@ -1,5 +1,5 @@
 using System.IdentityModel.Tokens.Jwt;
-using System.Text;
+using System.Security.Claims;
 using Dapper;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
@@ -28,6 +28,9 @@ builder.Services.AddAuthentication(options =>
 builder.Services.AddAuthorization();
 
 var app = builder.Build();
+
+app.UseAuthentication();
+app.UseAuthorization();
 
 app.MapPost("/usuarios", (CriarUsuarioRequest request) =>
 {
@@ -83,8 +86,12 @@ app.MapPost("/autenticacoes", (LoginRequest request) =>
     var key = "e7477fbd-29f1-4698-8aed-a35276bfe197"u8.ToArray();
     var credentials = new SigningCredentials(new SymmetricSecurityKey(key), SecurityAlgorithms.HmacSha256Signature);
     
+    var ci = new ClaimsIdentity();
+    ci.AddClaim(new Claim("UserId", usuario.Id.ToString()));
+    
     var tokenDescriptor = new SecurityTokenDescriptor
     {
+        Subject = ci,
         Expires = DateTime.UtcNow.AddHours(2),
         SigningCredentials = credentials
     };
@@ -94,9 +101,31 @@ app.MapPost("/autenticacoes", (LoginRequest request) =>
     return Results.Ok(tokenFinal);
 });
 
-app.MapGet("/teste-auth", () =>
+app.MapPost("/tarefas", (CriarTarefaRequest request, HttpContext httpContext) =>
 {
-    return Results.Ok("sucesso");
+    if (string.IsNullOrWhiteSpace(request.Titulo)
+        || string.IsNullOrWhiteSpace(request.Descricao))
+        return Results.BadRequest("Tarefa inválida.");
+
+    var userId = httpContext.User.FindFirst("UserId")?.Value;
+    
+    var tarefa = new Tarefa(request.Titulo, request.Descricao, int.Parse(userId));
+
+    var connectionString = "Host=localhost;Port=10400;Username=user;Password=senha123;Database=todoapi";
+    var sql = "INSERT INTO TAREFAS(TITULO, DESCRICAO, STATUS, IDUSUARIO, DATAABERTURA) " +
+              "VALUES (@titulo, @descricao, @status, @idUsuario, @dataAbertura)";
+    using var con = new NpgsqlConnection(connectionString);
+    
+    con.Execute(sql, new
+    {
+        tarefa.Titulo,
+        tarefa.Descricao,
+        tarefa.Status,
+        tarefa.IdUsuario,
+        tarefa.DataAbertura
+    });
+
+    return Results.Created();
 }).RequireAuthorization();
 
 app.Run();

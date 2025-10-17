@@ -7,7 +7,17 @@ public class Tarefa
     public string Descricao { get; private set; }
     public string Observacao { get; private set; }
     public int Status { get; private set; }
+    public int IdUsuario { get; private set; }
     public DateTime DataAbertura { get; private set; }
     public DateTime? DataInicio { get; private set; }
     public DateTime? DataFim { get; private set; }
+
+    public Tarefa(string titulo, string descricao, int idUsuario)
+    {
+        Titulo = titulo;
+        Descricao = descricao;
+        Status = 0;
+        IdUsuario = idUsuario;
+        DataAbertura = DateTime.UtcNow;
+    }
 }
