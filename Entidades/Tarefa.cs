@@ -12,6 +12,7 @@ public class Tarefa
     public DateTime? DataInicio { get; private set; }
     public DateTime? DataFim { get; private set; }
 
+    public Tarefa() {}
     public Tarefa(string titulo, string descricao, int idUsuario)
     {
         Titulo = titulo;

@@ -78,7 +78,7 @@ app.MapPost("/autenticacoes", (LoginRequest request) =>
     if (usuario == null)
         return Results.BadRequest("Senha incorreta.");
     
-    var senhaValida =  BCrypt.Net.BCrypt.Verify(request.Senha, usuario.Senha);
+    var senhaValida = BCrypt.Net.BCrypt.Verify(request.Senha, usuario.Senha);
     if (!senhaValida)
         return Results.BadRequest("Senha incorreta.");
     
@@ -126,6 +126,40 @@ app.MapPost("/tarefas", (CriarTarefaRequest request, HttpContext httpContext) =>
     });
 
     return Results.Created();
+}).RequireAuthorization();
+
+app.MapPatch("/tarefas/{id}", (int id, AtualizarTarefaRequest request, HttpContext httpContext) =>
+{
+    if (string.IsNullOrWhiteSpace(request.Titulo)
+        || string.IsNullOrWhiteSpace(request.Descricao))
+        return Results.BadRequest("Tarefa inválida.");
+
+    var userId = httpContext.User.FindFirst("UserId")?.Value;
+    
+    
+    var connectionString = "Host=localhost;Port=10400;Username=user;Password=senha123;Database=todoapi";
+    var sqlBuscarTarefa = "SELECT * FROM TAREFAS WHERE ID = @id AND IDUSUARIO = @idUsuario";
+    
+    using var con = new NpgsqlConnection(connectionString);
+    
+    var tarefa = con.QueryFirstOrDefault<Tarefa>(sqlBuscarTarefa, new
+    {
+        id,
+        idUsuario = int.Parse(userId)
+    });
+    
+    if (tarefa == null)
+        return Results.NotFound("Tarefa não cadastrada.");
+    
+    var sql = "UPDATE TAREFAS SET TITULO = @titulo, DESCRICAO = @descricao WHERE ID = @idTarefa";
+    con.Execute(sql, new
+    {
+        request.Titulo,
+        request.Descricao,
+        idTarefa = tarefa.Id
+    });
+
+    return Results.Ok();
 }).RequireAuthorization();
 
 app.Run();
