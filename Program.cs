@@ -44,16 +44,15 @@ app.MapPost("/usuarios", (CriarUsuarioRequest request) =>
         return Results.BadRequest("Senhas precisam ser iguais.");
 
     var senhaCriptografa = BCrypt.Net.BCrypt.HashPassword(request.Senha);
-    var usuario = new Usuario(request.Email, senhaCriptografa, request.Nome);
 
     var connectionString = "Host=localhost;Port=10400;Username=user;Password=senha123;Database=todoapi";
     var sql = "INSERT INTO USUARIOS(EMAIL, SENHA, NOME) VALUES (@email, @senha, @nome)";
     using var con = new NpgsqlConnection(connectionString);
     
     con.Execute(sql, new {
-        usuario.Email,
-        usuario.Senha,
-        usuario.Nome
+        request.Email,
+        senha = senhaCriptografa,
+        request.Nome
     });
     
     return Results.Created();
@@ -109,8 +108,6 @@ app.MapPost("/tarefas", (CriarTarefaRequest request, HttpContext httpContext) =>
 
     var userId = httpContext.User.FindFirst("UserId")?.Value;
     
-    var tarefa = new Tarefa(request.Titulo, request.Descricao, int.Parse(userId));
-
     var connectionString = "Host=localhost;Port=10400;Username=user;Password=senha123;Database=todoapi";
     var sql = "INSERT INTO TAREFAS(TITULO, DESCRICAO, STATUS, IDUSUARIO, DATAABERTURA) " +
               "VALUES (@titulo, @descricao, @status, @idUsuario, @dataAbertura)";
@@ -118,11 +115,11 @@ app.MapPost("/tarefas", (CriarTarefaRequest request, HttpContext httpContext) =>
     
     con.Execute(sql, new
     {
-        tarefa.Titulo,
-        tarefa.Descricao,
-        tarefa.Status,
-        tarefa.IdUsuario,
-        tarefa.DataAbertura
+        request.Titulo,
+        request.Descricao,
+        status = 0,
+        idUsuario = int.Parse(userId),
+        dataAbertura = DateTime.UtcNow
     });
 
     return Results.Created();
