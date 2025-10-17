@@ -245,4 +245,26 @@ app.MapPatch("/tarefas/{id}/finalizar", (int id, FinalizarTarefaRequest request,
     return Results.NoContent();
 }).RequireAuthorization();
 
+app.MapGet("/tarefas", (int? status, HttpContext httpContext) =>
+{
+    var userId = httpContext.User.FindFirst("UserId")?.Value;
+
+    var connectionString = "Host=localhost;Port=10400;Username=user;Password=senha123;Database=todoapi";
+    var sqlBuscarTarefa = "SELECT * FROM TAREFAS WHERE IDUSUARIO = @idUsuario";
+
+    var parameters = new DynamicParameters();
+    parameters.Add("idUsuario", int.Parse(userId));
+
+    if (status != null)
+    {
+        sqlBuscarTarefa += " AND  STATUS = @status";
+        parameters.Add("status", status);
+    }
+
+    using var con = new NpgsqlConnection(connectionString);
+    var tarefas = con.Query<Tarefa>(sqlBuscarTarefa, parameters).ToList();
+    
+    return Results.Ok(tarefas);
+}).RequireAuthorization();
+
 app.Run();
