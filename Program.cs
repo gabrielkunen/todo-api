@@ -189,4 +189,63 @@ app.MapDelete("/tarefas/{id}", (int id, HttpContext httpContext) =>
     return Results.NoContent();
 }).RequireAuthorization();
 
+app.MapPatch("/tarefas/{id}/iniciar", (int id, HttpContext httpContext) =>
+{
+    var userId = httpContext.User.FindFirst("UserId")?.Value;
+    
+    var connectionString = "Host=localhost;Port=10400;Username=user;Password=senha123;Database=todoapi";
+    var sqlBuscarTarefa = "SELECT * FROM TAREFAS WHERE ID = @id AND IDUSUARIO = @idUsuario";
+    
+    using var con = new NpgsqlConnection(connectionString);
+    
+    var tarefa = con.QueryFirstOrDefault<Tarefa>(sqlBuscarTarefa, new
+    {
+        id,
+        idUsuario = int.Parse(userId)
+    });
+    
+    if (tarefa == null)
+        return Results.NotFound("Tarefa não cadastrada.");
+    
+    var sql = "UPDATE TAREFAS SET STATUS = @status, DATAINICIO = @datainicio WHERE ID = @idTarefa";
+    con.Execute(sql, new
+    {
+        status = 1,
+        datainicio = DateTime.UtcNow,
+        idTarefa = tarefa.Id
+    });
+
+    return Results.NoContent();
+}).RequireAuthorization();
+
+app.MapPatch("/tarefas/{id}/finalizar", (int id, FinalizarTarefaRequest request, HttpContext httpContext) =>
+{
+    var userId = httpContext.User.FindFirst("UserId")?.Value;
+    
+    var connectionString = "Host=localhost;Port=10400;Username=user;Password=senha123;Database=todoapi";
+    var sqlBuscarTarefa = "SELECT * FROM TAREFAS WHERE ID = @id AND IDUSUARIO = @idUsuario";
+    
+    using var con = new NpgsqlConnection(connectionString);
+    
+    var tarefa = con.QueryFirstOrDefault<Tarefa>(sqlBuscarTarefa, new
+    {
+        id,
+        idUsuario = int.Parse(userId)
+    });
+    
+    if (tarefa == null)
+        return Results.NotFound("Tarefa não cadastrada.");
+    
+    var sql = "UPDATE TAREFAS SET STATUS = @status, DATAFIM = @datafim, OBSERVACAO = @observacao WHERE ID = @idTarefa";
+    con.Execute(sql, new
+    {
+        status = 2,
+        datafim = DateTime.UtcNow,
+        idTarefa = tarefa.Id,
+        observacao = request.Observacao
+    });
+
+    return Results.NoContent();
+}).RequireAuthorization();
+
 app.Run();
