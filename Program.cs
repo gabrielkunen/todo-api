@@ -162,4 +162,31 @@ app.MapPatch("/tarefas/{id}", (int id, AtualizarTarefaRequest request, HttpConte
     return Results.Ok();
 }).RequireAuthorization();
 
+app.MapDelete("/tarefas/{id}", (int id, HttpContext httpContext) =>
+{
+    var userId = httpContext.User.FindFirst("UserId")?.Value;
+    
+    var connectionString = "Host=localhost;Port=10400;Username=user;Password=senha123;Database=todoapi";
+    var sqlBuscarTarefa = "SELECT * FROM TAREFAS WHERE ID = @id AND IDUSUARIO = @idUsuario";
+    
+    using var con = new NpgsqlConnection(connectionString);
+    
+    var tarefa = con.QueryFirstOrDefault<Tarefa>(sqlBuscarTarefa, new
+    {
+        id,
+        idUsuario = int.Parse(userId)
+    });
+    
+    if (tarefa == null)
+        return Results.NotFound("Tarefa não cadastrada.");
+    
+    var sql = "DELETE FROM TAREFAS WHERE ID = @idTarefa";
+    con.Execute(sql, new
+    {
+        idTarefa = tarefa.Id
+    });
+
+    return Results.NoContent();
+}).RequireAuthorization();
+
 app.Run();
