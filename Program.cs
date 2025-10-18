@@ -45,11 +45,11 @@ app.MapPost("/usuarios", (CriarUsuarioRequest request) =>
 
     var senhaCriptografa = BCrypt.Net.BCrypt.HashPassword(request.Senha);
 
-    var connectionString = "Host=localhost;Port=10400;Username=user;Password=senha123;Database=todoapi";
-    var sql = "INSERT INTO USUARIOS(EMAIL, SENHA, NOME) VALUES (@email, @senha, @nome)";
+    const string connectionString = "Host=localhost;Port=10400;Username=user;Password=senha123;Database=todoapi";
+    var sqlInserirUsuario = "INSERT INTO USUARIOS(EMAIL, SENHA, NOME) VALUES (@email, @senha, @nome)";
     using var con = new NpgsqlConnection(connectionString);
     
-    con.Execute(sql, new {
+    con.Execute(sqlInserirUsuario, new {
         request.Email,
         senha = senhaCriptografa,
         request.Nome
@@ -64,7 +64,7 @@ app.MapPost("/autenticacoes", (LoginRequest request) =>
         || string.IsNullOrWhiteSpace(request.Senha))
         return Results.BadRequest("Senha incorreta.");
     
-    var connectionString = "Host=localhost;Port=10400;Username=user;Password=senha123;Database=todoapi";
+    const string connectionString = "Host=localhost;Port=10400;Username=user;Password=senha123;Database=todoapi";
     var sqlBuscarUsuario = "SELECT * FROM USUARIOS WHERE EMAIL = @email";
     
     using var con = new NpgsqlConnection(connectionString);
@@ -108,12 +108,12 @@ app.MapPost("/tarefas", (CriarTarefaRequest request, HttpContext httpContext) =>
 
     var userId = httpContext.User.FindFirst("UserId")?.Value;
     
-    var connectionString = "Host=localhost;Port=10400;Username=user;Password=senha123;Database=todoapi";
-    var sql = "INSERT INTO TAREFAS(TITULO, DESCRICAO, STATUS, IDUSUARIO, DATAABERTURA) " +
+    const string connectionString = "Host=localhost;Port=10400;Username=user;Password=senha123;Database=todoapi";
+    var sqlInserirTarefa = "INSERT INTO TAREFAS(TITULO, DESCRICAO, STATUS, IDUSUARIO, DATAABERTURA) " +
               "VALUES (@titulo, @descricao, @status, @idUsuario, @dataAbertura)";
     using var con = new NpgsqlConnection(connectionString);
     
-    con.Execute(sql, new
+    con.Execute(sqlInserirTarefa, new
     {
         request.Titulo,
         request.Descricao,
@@ -133,8 +133,7 @@ app.MapPatch("/tarefas/{id}", (int id, AtualizarTarefaRequest request, HttpConte
 
     var userId = httpContext.User.FindFirst("UserId")?.Value;
     
-    
-    var connectionString = "Host=localhost;Port=10400;Username=user;Password=senha123;Database=todoapi";
+    const string connectionString = "Host=localhost;Port=10400;Username=user;Password=senha123;Database=todoapi";
     var sqlBuscarTarefa = "SELECT * FROM TAREFAS WHERE ID = @id AND IDUSUARIO = @idUsuario";
     
     using var con = new NpgsqlConnection(connectionString);
@@ -148,8 +147,8 @@ app.MapPatch("/tarefas/{id}", (int id, AtualizarTarefaRequest request, HttpConte
     if (tarefa == null)
         return Results.NotFound("Tarefa não cadastrada.");
     
-    var sql = "UPDATE TAREFAS SET TITULO = @titulo, DESCRICAO = @descricao WHERE ID = @idTarefa";
-    con.Execute(sql, new
+    var sqlAtualizarTarefa = "UPDATE TAREFAS SET TITULO = @titulo, DESCRICAO = @descricao WHERE ID = @idTarefa";
+    con.Execute(sqlAtualizarTarefa, new
     {
         request.Titulo,
         request.Descricao,
@@ -163,7 +162,7 @@ app.MapDelete("/tarefas/{id}", (int id, HttpContext httpContext) =>
 {
     var userId = httpContext.User.FindFirst("UserId")?.Value;
     
-    var connectionString = "Host=localhost;Port=10400;Username=user;Password=senha123;Database=todoapi";
+    const string connectionString = "Host=localhost;Port=10400;Username=user;Password=senha123;Database=todoapi";
     var sqlBuscarTarefa = "SELECT * FROM TAREFAS WHERE ID = @id AND IDUSUARIO = @idUsuario";
     
     using var con = new NpgsqlConnection(connectionString);
@@ -177,8 +176,8 @@ app.MapDelete("/tarefas/{id}", (int id, HttpContext httpContext) =>
     if (tarefa == null)
         return Results.NotFound("Tarefa não cadastrada.");
     
-    var sql = "DELETE FROM TAREFAS WHERE ID = @idTarefa";
-    con.Execute(sql, new
+    var sqlDeletarTarefa = "DELETE FROM TAREFAS WHERE ID = @idTarefa";
+    con.Execute(sqlDeletarTarefa, new
     {
         idTarefa = tarefa.Id
     });
@@ -190,7 +189,7 @@ app.MapPatch("/tarefas/{id}/iniciar", (int id, HttpContext httpContext) =>
 {
     var userId = httpContext.User.FindFirst("UserId")?.Value;
     
-    var connectionString = "Host=localhost;Port=10400;Username=user;Password=senha123;Database=todoapi";
+    const string connectionString = "Host=localhost;Port=10400;Username=user;Password=senha123;Database=todoapi";
     var sqlBuscarTarefa = "SELECT * FROM TAREFAS WHERE ID = @id AND IDUSUARIO = @idUsuario";
     
     using var con = new NpgsqlConnection(connectionString);
@@ -204,8 +203,8 @@ app.MapPatch("/tarefas/{id}/iniciar", (int id, HttpContext httpContext) =>
     if (tarefa == null)
         return Results.NotFound("Tarefa não cadastrada.");
     
-    var sql = "UPDATE TAREFAS SET STATUS = @status, DATAINICIO = @datainicio WHERE ID = @idTarefa";
-    con.Execute(sql, new
+    var sqlAtualizarTarefa = "UPDATE TAREFAS SET STATUS = @status, DATAINICIO = @datainicio WHERE ID = @idTarefa";
+    con.Execute(sqlAtualizarTarefa, new
     {
         status = 1,
         datainicio = DateTime.UtcNow,
@@ -219,7 +218,7 @@ app.MapPatch("/tarefas/{id}/finalizar", (int id, FinalizarTarefaRequest request,
 {
     var userId = httpContext.User.FindFirst("UserId")?.Value;
     
-    var connectionString = "Host=localhost;Port=10400;Username=user;Password=senha123;Database=todoapi";
+    const string connectionString = "Host=localhost;Port=10400;Username=user;Password=senha123;Database=todoapi";
     var sqlBuscarTarefa = "SELECT * FROM TAREFAS WHERE ID = @id AND IDUSUARIO = @idUsuario";
     
     using var con = new NpgsqlConnection(connectionString);
@@ -233,8 +232,8 @@ app.MapPatch("/tarefas/{id}/finalizar", (int id, FinalizarTarefaRequest request,
     if (tarefa == null)
         return Results.NotFound("Tarefa não cadastrada.");
     
-    var sql = "UPDATE TAREFAS SET STATUS = @status, DATAFIM = @datafim, OBSERVACAO = @observacao WHERE ID = @idTarefa";
-    con.Execute(sql, new
+    var sqlAtualizarTarefa = "UPDATE TAREFAS SET STATUS = @status, DATAFIM = @datafim, OBSERVACAO = @observacao WHERE ID = @idTarefa";
+    con.Execute(sqlAtualizarTarefa, new
     {
         status = 2,
         datafim = DateTime.UtcNow,
@@ -249,7 +248,7 @@ app.MapGet("/tarefas", (int? status, HttpContext httpContext) =>
 {
     var userId = httpContext.User.FindFirst("UserId")?.Value;
 
-    var connectionString = "Host=localhost;Port=10400;Username=user;Password=senha123;Database=todoapi";
+    const string connectionString = "Host=localhost;Port=10400;Username=user;Password=senha123;Database=todoapi";
     var sqlBuscarTarefa = "SELECT * FROM TAREFAS WHERE IDUSUARIO = @idUsuario";
 
     var parameters = new DynamicParameters();
