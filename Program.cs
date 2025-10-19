@@ -45,17 +45,21 @@ app.UseAuthorization();
 app.MapPost("/usuarios", (CriarUsuarioRequest request, IUsuarioRepository usuarioRepository) =>
 {
     if (request.Senha != request.SenhaRepetida)
-        return Results.BadRequest("Senhas precisam ser iguais.");
+        return Results.BadRequest(new PadraoErroResponse("Senhas precisam ser iguais."));
 
     var usuarioExistente = usuarioRepository.BuscarPorEmail(request.Email);
     if (usuarioExistente != null)
-        return Results.BadRequest($"Usuário com email {request.Email} já cadastrado.");
+        return Results.BadRequest(new PadraoErroResponse($"Usuário com email {request.Email} já cadastrado."));
     
     var senhaCriptografa = BCrypt.Net.BCrypt.HashPassword(request.Senha);
 
-    usuarioRepository.Adicionar(new Usuario(request.Email, senhaCriptografa, request.Nome));
+    var usuario = new Usuario(request.Email, senhaCriptografa, request.Nome);
     
-    return Results.Created();
+    usuarioRepository.Adicionar(usuario);
+
+    return Results.Created(
+        string.Empty, 
+        new CriarUsuarioResponse(usuario.Email, usuario.Nome));
 }).AddEndpointFilter<ValidationFilter<CriarUsuarioRequest>>();
 
 app.MapPost("/autenticacoes", (LoginRequest request, IUsuarioRepository usuarioRepository) =>
@@ -63,11 +67,11 @@ app.MapPost("/autenticacoes", (LoginRequest request, IUsuarioRepository usuarioR
     var usuario = usuarioRepository.BuscarPorEmail(request.Email);
     
     if (usuario == null)
-        return Results.BadRequest("Senha incorreta.");
+        return Results.BadRequest(new PadraoErroResponse("Senha incorreta."));
     
     var senhaValida = BCrypt.Net.BCrypt.Verify(request.Senha, usuario.Senha);
     if (!senhaValida)
-        return Results.BadRequest("Senha incorreta.");
+        return Results.BadRequest(new PadraoErroResponse("Senha incorreta."));
     
     var handler = new JwtSecurityTokenHandler();
     var key = "e7477fbd-29f1-4698-8aed-a35276bfe197"u8.ToArray();
@@ -84,14 +88,13 @@ app.MapPost("/autenticacoes", (LoginRequest request, IUsuarioRepository usuarioR
     };
     var token = handler.CreateToken(tokenDescriptor);
     var tokenFinal = handler.WriteToken(token);
-    
-    return Results.Ok(tokenFinal);
+
+    return Results.Ok(new LoginResponse { Token = tokenFinal });
 }).AddEndpointFilter<ValidationFilter<LoginRequest>>();
 
 app.MapPost("/tarefas", (CriarTarefaRequest request, IUserContext userContext, ITarefaRepository tarefaRepository) =>
 {
     tarefaRepository.Adicionar(new Tarefa(request.Titulo, request.Descricao, userContext.IdUsuarioLogado, DateTime.UtcNow));
-    
     return Results.Created();
 }).RequireAuthorization().AddEndpointFilter<ValidationFilter<CriarTarefaRequest>>();
 
@@ -100,13 +103,13 @@ app.MapPatch("/tarefas/{id}", (int id, AtualizarTarefaRequest request, IUserCont
     var tarefa = tarefaRepository.Buscar(id, userContext.IdUsuarioLogado);
     
     if (tarefa == null)
-        return Results.NotFound("Tarefa não cadastrada.");
+        return Results.NotFound(new PadraoErroResponse("Tarefa não cadastrada."));
 
     tarefa.AtualizarDados(request.Titulo, request.Descricao);
     
     tarefaRepository.Atualizar(tarefa);
     
-    return Results.Ok();
+    return Results.NoContent();
 }).RequireAuthorization().AddEndpointFilter<ValidationFilter<AtualizarTarefaRequest>>();
 
 app.MapDelete("/tarefas/{id}", (int id, IUserContext userContext, ITarefaRepository  tarefaRepository) =>
@@ -114,7 +117,7 @@ app.MapDelete("/tarefas/{id}", (int id, IUserContext userContext, ITarefaReposit
     var tarefa = tarefaRepository.Buscar(id, userContext.IdUsuarioLogado);
     
     if (tarefa == null)
-        return Results.NotFound("Tarefa não cadastrada.");
+        return Results.NotFound(new PadraoErroResponse("Tarefa não cadastrada."));
     
     tarefaRepository.Deletar(tarefa.Id);
 
@@ -126,7 +129,7 @@ app.MapPatch("/tarefas/{id}/iniciar", (int id, IUserContext userContext, ITarefa
     var tarefa = tarefaRepository.Buscar(id, userContext.IdUsuarioLogado);
     
     if (tarefa == null)
-        return Results.NotFound("Tarefa não cadastrada.");
+        return Results.NotFound(new PadraoErroResponse("Tarefa não cadastrada."));
 
     tarefa.Iniciar();
     
@@ -140,7 +143,7 @@ app.MapPatch("/tarefas/{id}/finalizar", (int id, FinalizarTarefaRequest request,
     var tarefa = tarefaRepository.Buscar(id, userContext.IdUsuarioLogado);
     
     if (tarefa == null)
-        return Results.NotFound("Tarefa não cadastrada.");
+        return Results.NotFound(new PadraoErroResponse("Tarefa não cadastrada."));
 
     tarefa.Finalizar(request.Observacao);
     
