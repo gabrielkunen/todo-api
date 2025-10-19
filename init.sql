@@ -10,7 +10,7 @@ CREATE TABLE TAREFAS (
      titulo VARCHAR (100) NOT NULL,
      descricao VARCHAR (500) NOT NULL,
      observacao VARCHAR (500) NULL,
-     status INT NOT NULL,
+     status VARCHAR (100) NOT NULL,
      idusuario INT NOT NULL,
      dataabertura TIMESTAMP NOT NULL,
      datainicio TIMESTAMP NULL,

@@ -1,3 +1,5 @@
+using TodoApi.EstadoTarefa;
+
 namespace TodoApi.Entidades;
 
 public class Tarefa
@@ -6,18 +8,18 @@ public class Tarefa
     public string Titulo { get; private set; }
     public string Descricao { get; private set; }
     public string Observacao { get; private set; }
-    public int Status { get; private set; }
+    public IEstadoTarefa Status { get; private set; }
+    public string StatusNome => Status.GetType().Name;
     public int IdUsuario { get; private set; }
     public DateTime DataAbertura { get; private set; }
     public DateTime? DataInicio { get; private set; }
     public DateTime? DataFim { get; private set; }
-    public Tarefa() {}
 
-    public Tarefa(string titulo, string descricao, int status, int idUsuario, DateTime dataAbertura)
+    public Tarefa(string titulo, string descricao, int idUsuario, DateTime dataAbertura)
     {
         Titulo = titulo;
         Descricao = descricao;
-        Status = status;
+        Status = new TarefaCriada();
         IdUsuario = idUsuario;
         DataAbertura = dataAbertura;
     }
@@ -30,14 +32,33 @@ public class Tarefa
 
     public void Iniciar()
     {
-        Status = 1;
+        Status.Iniciar(this);
         DataInicio = DateTime.UtcNow;
     }
 
     public void Finalizar(string observacao)
     {
-        Status = 2;
+        Status.Finalizar(this);
         DataFim = DateTime.UtcNow;
         Observacao = observacao;
+    }
+
+    public void SetEstado(IEstadoTarefa estado)
+    {
+        Status = estado;
+    }
+
+    // Dapper
+    public Tarefa(int id, string titulo, string descricao, string observacao, IEstadoTarefa status, int idUsuario, DateTime dataAbertura, DateTime? dataInicio, DateTime? dataFim)
+    {
+        Id = id;
+        Titulo = titulo;
+        Descricao = descricao;
+        Observacao = observacao;
+        Status = status;
+        IdUsuario = idUsuario;
+        DataAbertura = dataAbertura;
+        DataInicio = dataInicio;
+        DataFim = dataFim;
     }
 }

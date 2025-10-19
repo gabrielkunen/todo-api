@@ -90,7 +90,7 @@ app.MapPost("/autenticacoes", (LoginRequest request, IUsuarioRepository usuarioR
 
 app.MapPost("/tarefas", (CriarTarefaRequest request, IUserContext userContext, ITarefaRepository tarefaRepository) =>
 {
-    tarefaRepository.Adicionar(new Tarefa(request.Titulo, request.Descricao, 0, userContext.IdUsuarioLogado, DateTime.UtcNow));
+    tarefaRepository.Adicionar(new Tarefa(request.Titulo, request.Descricao, userContext.IdUsuarioLogado, DateTime.UtcNow));
     
     return Results.Created();
 }).RequireAuthorization().AddEndpointFilter<ValidationFilter<CriarTarefaRequest>>();
@@ -149,7 +149,7 @@ app.MapPatch("/tarefas/{id}/finalizar", (int id, FinalizarTarefaRequest request,
     return Results.NoContent();
 }).RequireAuthorization();
 
-app.MapGet("/tarefas", (int? status, IUserContext userContext, ITarefaRepository tarefaRepository) =>
+app.MapGet("/tarefas", (string? status, IUserContext userContext, ITarefaRepository tarefaRepository) =>
 {
     var tarefas = tarefaRepository.Buscar(userContext.IdUsuarioLogado, status);
     return Results.Ok(tarefas);

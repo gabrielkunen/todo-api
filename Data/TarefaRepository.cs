@@ -1,6 +1,7 @@
 using System.Text;
 using Dapper;
 using TodoApi.Entidades;
+using TodoApi.EstadoTarefa;
 
 namespace TodoApi.Data;
 
@@ -23,7 +24,7 @@ public class TarefaRepository : ITarefaRepository
         var parameters = new DynamicParameters();
         parameters.Add("titulo", tarefa.Titulo);
         parameters.Add("descricao", tarefa.Descricao);
-        parameters.Add("status", tarefa.Status);
+        parameters.Add("status", tarefa.StatusNome);
         parameters.Add("idUsuario", tarefa.IdUsuario);
         parameters.Add("dataAbertura", tarefa.DataAbertura);
         
@@ -40,10 +41,15 @@ public class TarefaRepository : ITarefaRepository
         parameters.Add("idUsuario", idUsuario);
         
         using var connection = _context.CreateConnection();
-        return connection.QueryFirstOrDefault<Tarefa>(sql, parameters);
+        var retorno = connection.QueryFirstOrDefault(sql, parameters);
+
+        if (retorno == null)
+            return null;
+
+        return MapearResultadoDbParaTarefa(retorno);
     }
 
-    public List<Tarefa> Buscar(int idUsuario, int? status)
+    public List<Tarefa> Buscar(int idUsuario, string? status)
     {
         var sql = new StringBuilder($"SELECT * FROM {_tableName} WHERE IDUSUARIO = @idUsuario");
         
@@ -57,7 +63,13 @@ public class TarefaRepository : ITarefaRepository
         }
         
         using var connection = _context.CreateConnection();
-        return connection.Query<Tarefa>(sql.ToString(), parameters).ToList();
+        var retorno = connection.Query(sql.ToString(), parameters);
+        
+        var listaRetorno = new List<Tarefa>();
+        foreach (var tarefaDb in retorno)
+            listaRetorno.Add(MapearResultadoDbParaTarefa(tarefaDb));
+
+        return listaRetorno;
     }
 
     public void Atualizar(Tarefa tarefa)
@@ -74,8 +86,8 @@ public class TarefaRepository : ITarefaRepository
         var parameters = new DynamicParameters();
         parameters.Add("titulo", tarefa.Titulo);
         parameters.Add("descricao", tarefa.Descricao);
-        parameters.Add("observacao", tarefa.Descricao);
-        parameters.Add("status", tarefa.Status);
+        parameters.Add("observacao", tarefa.Observacao);
+        parameters.Add("status", tarefa.StatusNome);
         parameters.Add("dataInicio", tarefa.DataInicio);
         parameters.Add("dataFim", tarefa.DataFim);
         parameters.Add("id", tarefa.Id);
@@ -93,5 +105,31 @@ public class TarefaRepository : ITarefaRepository
         
         using var connection = _context.CreateConnection();
         connection.Execute(sql, parameters);
+    }
+
+    private Tarefa MapearResultadoDbParaTarefa(dynamic retorno)
+    {
+        return new Tarefa(
+            retorno.id,
+            retorno.titulo,
+            retorno.descricao,
+            retorno.observacao,
+            MapearStringTarefaStatusParaClasse((string)retorno.status),
+            retorno.idusuario,
+            retorno.dataabertura,
+            retorno.datainicio,
+            retorno.datafim
+        );
+    }
+    
+    private IEstadoTarefa? MapearStringTarefaStatusParaClasse(string status)
+    {
+        return status switch
+        {
+            "TarefaCriada" => new TarefaCriada(),
+            "TarefaIniciada" => new TarefaIniciada(),
+            "TarefaFinalizada" => new TarefaFinalizada(),
+            _ => throw new ArgumentException("Status da tarefa inválido")
+        };
     }
 }
