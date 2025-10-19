@@ -1,0 +1,12 @@
+using TodoApi.Entidades;
+
+namespace TodoApi.Data;
+
+public interface ITarefaRepository
+{
+    void Adicionar(Tarefa tarefa);
+    Tarefa? Buscar(int id, int idUsuario);
+    List<Tarefa> Buscar(int idUsuario, int? status);
+    void Atualizar(Tarefa tarefa);
+    void Deletar(int id);
+}

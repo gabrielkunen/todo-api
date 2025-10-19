@@ -1,13 +1,16 @@
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
-using Dapper;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
-using Npgsql;
+using TodoApi.Data;
 using TodoApi.Dto;
 using TodoApi.Entidades;
 
 var builder = WebApplication.CreateBuilder(args);
+
+builder.Services.AddScoped<ITarefaRepository, TarefaRepository>();
+builder.Services.AddScoped<IUsuarioRepository, UsuarioRepository>();
+builder.Services.AddSingleton<TodoApiContext>();
 
 builder.Services.AddAuthentication(options =>
     {
@@ -32,7 +35,7 @@ var app = builder.Build();
 app.UseAuthentication();
 app.UseAuthorization();
 
-app.MapPost("/usuarios", (CriarUsuarioRequest request) =>
+app.MapPost("/usuarios", (CriarUsuarioRequest request, IUsuarioRepository usuarioRepository) =>
 {
     if (string.IsNullOrWhiteSpace(request.Email)
         || string.IsNullOrWhiteSpace(request.Senha)
@@ -45,34 +48,18 @@ app.MapPost("/usuarios", (CriarUsuarioRequest request) =>
 
     var senhaCriptografa = BCrypt.Net.BCrypt.HashPassword(request.Senha);
 
-    const string connectionString = "Host=localhost;Port=10400;Username=user;Password=senha123;Database=todoapi";
-    var sqlInserirUsuario = "INSERT INTO USUARIOS(EMAIL, SENHA, NOME) VALUES (@email, @senha, @nome)";
-    using var con = new NpgsqlConnection(connectionString);
-    
-    con.Execute(sqlInserirUsuario, new {
-        request.Email,
-        senha = senhaCriptografa,
-        request.Nome
-    });
+    usuarioRepository.Adicionar(new Usuario(request.Email, senhaCriptografa, request.Nome));
     
     return Results.Created();
 });
 
-app.MapPost("/autenticacoes", (LoginRequest request) =>
+app.MapPost("/autenticacoes", (LoginRequest request, IUsuarioRepository usuarioRepository) =>
 {
     if (string.IsNullOrWhiteSpace(request.Email)
         || string.IsNullOrWhiteSpace(request.Senha))
         return Results.BadRequest("Senha incorreta.");
-    
-    const string connectionString = "Host=localhost;Port=10400;Username=user;Password=senha123;Database=todoapi";
-    var sqlBuscarUsuario = "SELECT * FROM USUARIOS WHERE EMAIL = @email";
-    
-    using var con = new NpgsqlConnection(connectionString);
-    
-    var usuario = con.QueryFirstOrDefault<Usuario>(sqlBuscarUsuario, new
-    {
-        request.Email
-    });
+
+    var usuario = usuarioRepository.BuscarPorEmail(request.Email);
     
     if (usuario == null)
         return Results.BadRequest("Senha incorreta.");
@@ -100,168 +87,91 @@ app.MapPost("/autenticacoes", (LoginRequest request) =>
     return Results.Ok(tokenFinal);
 });
 
-app.MapPost("/tarefas", (CriarTarefaRequest request, HttpContext httpContext) =>
+app.MapPost("/tarefas", (CriarTarefaRequest request, HttpContext httpContext, ITarefaRepository tarefaRepository) =>
 {
     if (string.IsNullOrWhiteSpace(request.Titulo)
         || string.IsNullOrWhiteSpace(request.Descricao))
         return Results.BadRequest("Tarefa inválida.");
 
-    var userId = httpContext.User.FindFirst("UserId")?.Value;
+    var userId = int.Parse(httpContext.User.FindFirst("UserId")?.Value);
     
-    const string connectionString = "Host=localhost;Port=10400;Username=user;Password=senha123;Database=todoapi";
-    var sqlInserirTarefa = "INSERT INTO TAREFAS(TITULO, DESCRICAO, STATUS, IDUSUARIO, DATAABERTURA) " +
-              "VALUES (@titulo, @descricao, @status, @idUsuario, @dataAbertura)";
-    using var con = new NpgsqlConnection(connectionString);
+    tarefaRepository.Adicionar(new Tarefa(request.Titulo, request.Descricao, 0, userId, DateTime.UtcNow));
     
-    con.Execute(sqlInserirTarefa, new
-    {
-        request.Titulo,
-        request.Descricao,
-        status = 0,
-        idUsuario = int.Parse(userId),
-        dataAbertura = DateTime.UtcNow
-    });
-
     return Results.Created();
 }).RequireAuthorization();
 
-app.MapPatch("/tarefas/{id}", (int id, AtualizarTarefaRequest request, HttpContext httpContext) =>
+app.MapPatch("/tarefas/{id}", (int id, AtualizarTarefaRequest request, HttpContext httpContext, ITarefaRepository  tarefaRepository) =>
 {
     if (string.IsNullOrWhiteSpace(request.Titulo)
         || string.IsNullOrWhiteSpace(request.Descricao))
         return Results.BadRequest("Tarefa inválida.");
 
-    var userId = httpContext.User.FindFirst("UserId")?.Value;
+    var userId = int.Parse(httpContext.User.FindFirst("UserId")?.Value);
     
-    const string connectionString = "Host=localhost;Port=10400;Username=user;Password=senha123;Database=todoapi";
-    var sqlBuscarTarefa = "SELECT * FROM TAREFAS WHERE ID = @id AND IDUSUARIO = @idUsuario";
-    
-    using var con = new NpgsqlConnection(connectionString);
-    
-    var tarefa = con.QueryFirstOrDefault<Tarefa>(sqlBuscarTarefa, new
-    {
-        id,
-        idUsuario = int.Parse(userId)
-    });
+    var tarefa = tarefaRepository.Buscar(id, userId);
     
     if (tarefa == null)
         return Results.NotFound("Tarefa não cadastrada.");
-    
-    var sqlAtualizarTarefa = "UPDATE TAREFAS SET TITULO = @titulo, DESCRICAO = @descricao WHERE ID = @idTarefa";
-    con.Execute(sqlAtualizarTarefa, new
-    {
-        request.Titulo,
-        request.Descricao,
-        idTarefa = tarefa.Id
-    });
 
+    tarefa.AtualizarDados(request.Titulo, request.Descricao);
+    
+    tarefaRepository.Atualizar(tarefa);
+    
     return Results.Ok();
 }).RequireAuthorization();
 
-app.MapDelete("/tarefas/{id}", (int id, HttpContext httpContext) =>
+app.MapDelete("/tarefas/{id}", (int id, HttpContext httpContext, ITarefaRepository  tarefaRepository) =>
 {
-    var userId = httpContext.User.FindFirst("UserId")?.Value;
+    var userId = int.Parse(httpContext.User.FindFirst("UserId")?.Value);
     
-    const string connectionString = "Host=localhost;Port=10400;Username=user;Password=senha123;Database=todoapi";
-    var sqlBuscarTarefa = "SELECT * FROM TAREFAS WHERE ID = @id AND IDUSUARIO = @idUsuario";
-    
-    using var con = new NpgsqlConnection(connectionString);
-    
-    var tarefa = con.QueryFirstOrDefault<Tarefa>(sqlBuscarTarefa, new
-    {
-        id,
-        idUsuario = int.Parse(userId)
-    });
+    var tarefa = tarefaRepository.Buscar(id, userId);
     
     if (tarefa == null)
         return Results.NotFound("Tarefa não cadastrada.");
     
-    var sqlDeletarTarefa = "DELETE FROM TAREFAS WHERE ID = @idTarefa";
-    con.Execute(sqlDeletarTarefa, new
-    {
-        idTarefa = tarefa.Id
-    });
+    tarefaRepository.Deletar(tarefa.Id);
 
     return Results.NoContent();
 }).RequireAuthorization();
 
-app.MapPatch("/tarefas/{id}/iniciar", (int id, HttpContext httpContext) =>
+app.MapPatch("/tarefas/{id}/iniciar", (int id, HttpContext httpContext, ITarefaRepository  tarefaRepository) =>
 {
-    var userId = httpContext.User.FindFirst("UserId")?.Value;
+    var userId = int.Parse(httpContext.User.FindFirst("UserId")?.Value);
     
-    const string connectionString = "Host=localhost;Port=10400;Username=user;Password=senha123;Database=todoapi";
-    var sqlBuscarTarefa = "SELECT * FROM TAREFAS WHERE ID = @id AND IDUSUARIO = @idUsuario";
     
-    using var con = new NpgsqlConnection(connectionString);
-    
-    var tarefa = con.QueryFirstOrDefault<Tarefa>(sqlBuscarTarefa, new
-    {
-        id,
-        idUsuario = int.Parse(userId)
-    });
+    var tarefa = tarefaRepository.Buscar(id, userId);
     
     if (tarefa == null)
         return Results.NotFound("Tarefa não cadastrada.");
-    
-    var sqlAtualizarTarefa = "UPDATE TAREFAS SET STATUS = @status, DATAINICIO = @datainicio WHERE ID = @idTarefa";
-    con.Execute(sqlAtualizarTarefa, new
-    {
-        status = 1,
-        datainicio = DateTime.UtcNow,
-        idTarefa = tarefa.Id
-    });
 
+    tarefa.Iniciar();
+    
+    tarefaRepository.Atualizar(tarefa);
+    
     return Results.NoContent();
 }).RequireAuthorization();
 
-app.MapPatch("/tarefas/{id}/finalizar", (int id, FinalizarTarefaRequest request, HttpContext httpContext) =>
+app.MapPatch("/tarefas/{id}/finalizar", (int id, FinalizarTarefaRequest request, HttpContext httpContext, ITarefaRepository tarefaRepository) =>
 {
-    var userId = httpContext.User.FindFirst("UserId")?.Value;
-    
-    const string connectionString = "Host=localhost;Port=10400;Username=user;Password=senha123;Database=todoapi";
-    var sqlBuscarTarefa = "SELECT * FROM TAREFAS WHERE ID = @id AND IDUSUARIO = @idUsuario";
-    
-    using var con = new NpgsqlConnection(connectionString);
-    
-    var tarefa = con.QueryFirstOrDefault<Tarefa>(sqlBuscarTarefa, new
-    {
-        id,
-        idUsuario = int.Parse(userId)
-    });
+    var userId = int.Parse(httpContext.User.FindFirst("UserId")?.Value);
+
+    var tarefa = tarefaRepository.Buscar(id, userId);
     
     if (tarefa == null)
         return Results.NotFound("Tarefa não cadastrada.");
+
+    tarefa.Finalizar(request.Observacao);
     
-    var sqlAtualizarTarefa = "UPDATE TAREFAS SET STATUS = @status, DATAFIM = @datafim, OBSERVACAO = @observacao WHERE ID = @idTarefa";
-    con.Execute(sqlAtualizarTarefa, new
-    {
-        status = 2,
-        datafim = DateTime.UtcNow,
-        idTarefa = tarefa.Id,
-        observacao = request.Observacao
-    });
+    tarefaRepository.Atualizar(tarefa);
 
     return Results.NoContent();
 }).RequireAuthorization();
 
-app.MapGet("/tarefas", (int? status, HttpContext httpContext) =>
+app.MapGet("/tarefas", (int? status, HttpContext httpContext, ITarefaRepository tarefaRepository) =>
 {
-    var userId = httpContext.User.FindFirst("UserId")?.Value;
+    var userId = int.Parse(httpContext.User.FindFirst("UserId")?.Value);
 
-    const string connectionString = "Host=localhost;Port=10400;Username=user;Password=senha123;Database=todoapi";
-    var sqlBuscarTarefa = "SELECT * FROM TAREFAS WHERE IDUSUARIO = @idUsuario";
-
-    var parameters = new DynamicParameters();
-    parameters.Add("idUsuario", int.Parse(userId));
-
-    if (status != null)
-    {
-        sqlBuscarTarefa += " AND  STATUS = @status";
-        parameters.Add("status", status);
-    }
-
-    using var con = new NpgsqlConnection(connectionString);
-    var tarefas = con.Query<Tarefa>(sqlBuscarTarefa, parameters).ToList();
+    var tarefas = tarefaRepository.Buscar(userId, status);
     
     return Results.Ok(tarefas);
 }).RequireAuthorization();
