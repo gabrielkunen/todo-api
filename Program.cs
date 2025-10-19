@@ -46,6 +46,10 @@ app.MapPost("/usuarios", (CriarUsuarioRequest request, IUsuarioRepository usuari
     if (request.Senha != request.SenhaRepetida)
         return Results.BadRequest("Senhas precisam ser iguais.");
 
+    var usuarioExistente = usuarioRepository.BuscarPorEmail(request.Email);
+    if (usuarioExistente != null)
+        return Results.BadRequest($"Usuário com email {request.Email} já cadastrado.");
+    
     var senhaCriptografa = BCrypt.Net.BCrypt.HashPassword(request.Senha);
 
     usuarioRepository.Adicionar(new Usuario(request.Email, senhaCriptografa, request.Nome));
