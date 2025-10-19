@@ -1,10 +1,12 @@
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
+using FluentValidation;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using TodoApi.Data;
 using TodoApi.Dto;
 using TodoApi.Entidades;
+using TodoApi.Filters;
 using TodoApi.Network;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -13,6 +15,7 @@ builder.Services.AddScoped<ITarefaRepository, TarefaRepository>();
 builder.Services.AddScoped<IUsuarioRepository, UsuarioRepository>();
 builder.Services.AddSingleton<TodoApiContext>();
 builder.Services.AddScoped<IUserContext, HttpUserContext>();
+builder.Services.AddValidatorsFromAssemblyContaining<Program>();
 
 builder.Services.AddHttpContextAccessor();
 
@@ -41,12 +44,6 @@ app.UseAuthorization();
 
 app.MapPost("/usuarios", (CriarUsuarioRequest request, IUsuarioRepository usuarioRepository) =>
 {
-    if (string.IsNullOrWhiteSpace(request.Email)
-        || string.IsNullOrWhiteSpace(request.Senha)
-        || string.IsNullOrWhiteSpace(request.SenhaRepetida)
-        || string.IsNullOrWhiteSpace(request.Nome))
-        return Results.BadRequest("Usuário inválido.");
-
     if (request.Senha != request.SenhaRepetida)
         return Results.BadRequest("Senhas precisam ser iguais.");
 
@@ -59,14 +56,10 @@ app.MapPost("/usuarios", (CriarUsuarioRequest request, IUsuarioRepository usuari
     usuarioRepository.Adicionar(new Usuario(request.Email, senhaCriptografa, request.Nome));
     
     return Results.Created();
-});
+}).AddEndpointFilter<ValidationFilter<CriarUsuarioRequest>>();
 
 app.MapPost("/autenticacoes", (LoginRequest request, IUsuarioRepository usuarioRepository) =>
 {
-    if (string.IsNullOrWhiteSpace(request.Email)
-        || string.IsNullOrWhiteSpace(request.Senha))
-        return Results.BadRequest("Senha incorreta.");
-
     var usuario = usuarioRepository.BuscarPorEmail(request.Email);
     
     if (usuario == null)
@@ -93,25 +86,17 @@ app.MapPost("/autenticacoes", (LoginRequest request, IUsuarioRepository usuarioR
     var tokenFinal = handler.WriteToken(token);
     
     return Results.Ok(tokenFinal);
-});
+}).AddEndpointFilter<ValidationFilter<LoginRequest>>();
 
 app.MapPost("/tarefas", (CriarTarefaRequest request, IUserContext userContext, ITarefaRepository tarefaRepository) =>
 {
-    if (string.IsNullOrWhiteSpace(request.Titulo)
-        || string.IsNullOrWhiteSpace(request.Descricao))
-        return Results.BadRequest("Tarefa inválida.");
-
     tarefaRepository.Adicionar(new Tarefa(request.Titulo, request.Descricao, 0, userContext.IdUsuarioLogado, DateTime.UtcNow));
     
     return Results.Created();
-}).RequireAuthorization();
+}).RequireAuthorization().AddEndpointFilter<ValidationFilter<CriarTarefaRequest>>();
 
 app.MapPatch("/tarefas/{id}", (int id, AtualizarTarefaRequest request, IUserContext userContext, ITarefaRepository  tarefaRepository) =>
 {
-    if (string.IsNullOrWhiteSpace(request.Titulo)
-        || string.IsNullOrWhiteSpace(request.Descricao))
-        return Results.BadRequest("Tarefa inválida.");
-
     var tarefa = tarefaRepository.Buscar(id, userContext.IdUsuarioLogado);
     
     if (tarefa == null)
@@ -122,7 +107,7 @@ app.MapPatch("/tarefas/{id}", (int id, AtualizarTarefaRequest request, IUserCont
     tarefaRepository.Atualizar(tarefa);
     
     return Results.Ok();
-}).RequireAuthorization();
+}).RequireAuthorization().AddEndpointFilter<ValidationFilter<AtualizarTarefaRequest>>();
 
 app.MapDelete("/tarefas/{id}", (int id, IUserContext userContext, ITarefaRepository  tarefaRepository) =>
 {
