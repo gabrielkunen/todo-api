@@ -16,10 +16,10 @@ public class TarefaRepository : ITarefaRepository
         _tableName = "TAREFAS";
     }
     
-    public void Adicionar(Tarefa tarefa)
+    public int Adicionar(Tarefa tarefa)
     {
         var sql = $"INSERT INTO {_tableName}(TITULO, DESCRICAO, STATUS, IDUSUARIO, DATAABERTURA) " +
-                               "VALUES (@titulo, @descricao, @status, @idUsuario, @dataAbertura)";
+                               "VALUES (@titulo, @descricao, @status, @idUsuario, @dataAbertura) RETURNING ID";
         
         var parameters = new DynamicParameters();
         parameters.Add("titulo", tarefa.Titulo);
@@ -29,7 +29,7 @@ public class TarefaRepository : ITarefaRepository
         parameters.Add("dataAbertura", tarefa.DataAbertura);
         
         using var connection = _context.CreateConnection();
-        connection.Execute(sql, parameters);
+        return connection.ExecuteScalar<int>(sql, parameters);
     }
 
     public Tarefa? Buscar(int id, int idUsuario)
@@ -122,7 +122,7 @@ public class TarefaRepository : ITarefaRepository
         );
     }
     
-    private IEstadoTarefa? MapearStringTarefaStatusParaClasse(string status)
+    private IEstadoTarefa MapearStringTarefaStatusParaClasse(string status)
     {
         return status switch
         {

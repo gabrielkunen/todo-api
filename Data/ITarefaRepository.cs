@@ -4,7 +4,7 @@ namespace TodoApi.Data;
 
 public interface ITarefaRepository
 {
-    void Adicionar(Tarefa tarefa);
+    int Adicionar(Tarefa tarefa);
     Tarefa? Buscar(int id, int idUsuario);
     List<Tarefa> Buscar(int idUsuario, string? status);
     void Atualizar(Tarefa tarefa);

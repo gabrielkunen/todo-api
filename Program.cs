@@ -7,6 +7,7 @@ using TodoApi.Data;
 using TodoApi.Dto;
 using TodoApi.Entidades;
 using TodoApi.Filters;
+using TodoApi.Middlewares;
 using TodoApi.Network;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -41,6 +42,7 @@ var app = builder.Build();
 
 app.UseAuthentication();
 app.UseAuthorization();
+app.UseMiddleware<ExceptionMiddleware>();
 
 app.MapPost("/usuarios", (CriarUsuarioRequest request, IUsuarioRepository usuarioRepository) =>
 {
@@ -94,8 +96,12 @@ app.MapPost("/autenticacoes", (LoginRequest request, IUsuarioRepository usuarioR
 
 app.MapPost("/tarefas", (CriarTarefaRequest request, IUserContext userContext, ITarefaRepository tarefaRepository) =>
 {
-    tarefaRepository.Adicionar(new Tarefa(request.Titulo, request.Descricao, userContext.IdUsuarioLogado, DateTime.UtcNow));
-    return Results.Created();
+    var tarefa = new Tarefa(request.Titulo, request.Descricao, userContext.IdUsuarioLogado, DateTime.UtcNow);
+    var id = tarefaRepository.Adicionar(tarefa);
+    return Results.Created(
+        string.Empty, 
+        new CriarTarefaResponse(id, tarefa.Titulo, tarefa.Descricao, tarefa.StatusNome, tarefa.DataAbertura.ToString("yyyy-MM-dd HH:mm:ss")));
+    
 }).RequireAuthorization().AddEndpointFilter<ValidationFilter<CriarTarefaRequest>>();
 
 app.MapPatch("/tarefas/{id}", (int id, AtualizarTarefaRequest request, IUserContext userContext, ITarefaRepository  tarefaRepository) =>

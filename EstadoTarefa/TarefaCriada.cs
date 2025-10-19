@@ -1,4 +1,5 @@
 using TodoApi.Entidades;
+using TodoApi.Exceptions;
 
 namespace TodoApi.EstadoTarefa;
 
@@ -11,6 +12,6 @@ public class TarefaCriada : IEstadoTarefa
 
     public void Finalizar(Tarefa tarefa)
     {
-        throw new Exception("Tarefa não foi iniciada");
+        throw new DomainException("Tarefa não foi iniciada");
     }
 }
