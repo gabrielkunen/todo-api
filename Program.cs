@@ -91,7 +91,7 @@ app.MapPost("/autenticacoes", (LoginRequest request, IUsuarioRepository usuarioR
     var tokenDescriptor = new SecurityTokenDescriptor
     {
         Subject = ci,
-        Expires = DateTime.UtcNow.AddSeconds(10),
+        Expires = DateTime.UtcNow.AddSeconds(Convert.ToInt32(builder.Configuration["ConfiguracoesJwt:ValidadeSegundos"])),
         SigningCredentials = credentials,
         IssuedAt = DateTime.UtcNow,
         Issuer = builder.Configuration["ConfiguracoesJwt:Issuer"],
