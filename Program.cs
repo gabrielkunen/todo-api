@@ -5,12 +5,16 @@ using Microsoft.IdentityModel.Tokens;
 using TodoApi.Data;
 using TodoApi.Dto;
 using TodoApi.Entidades;
+using TodoApi.Network;
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddScoped<ITarefaRepository, TarefaRepository>();
 builder.Services.AddScoped<IUsuarioRepository, UsuarioRepository>();
 builder.Services.AddSingleton<TodoApiContext>();
+builder.Services.AddScoped<IUserContext, HttpUserContext>();
+
+builder.Services.AddHttpContextAccessor();
 
 builder.Services.AddAuthentication(options =>
     {
@@ -77,7 +81,7 @@ app.MapPost("/autenticacoes", (LoginRequest request, IUsuarioRepository usuarioR
     var credentials = new SigningCredentials(new SymmetricSecurityKey(key), SecurityAlgorithms.HmacSha256Signature);
     
     var ci = new ClaimsIdentity();
-    ci.AddClaim(new Claim("UserId", usuario.Id.ToString()));
+    ci.AddClaim(new Claim(ClaimTypes.NameIdentifier, usuario.Id.ToString()));
     
     var tokenDescriptor = new SecurityTokenDescriptor
     {
@@ -91,28 +95,24 @@ app.MapPost("/autenticacoes", (LoginRequest request, IUsuarioRepository usuarioR
     return Results.Ok(tokenFinal);
 });
 
-app.MapPost("/tarefas", (CriarTarefaRequest request, HttpContext httpContext, ITarefaRepository tarefaRepository) =>
+app.MapPost("/tarefas", (CriarTarefaRequest request, IUserContext userContext, ITarefaRepository tarefaRepository) =>
 {
     if (string.IsNullOrWhiteSpace(request.Titulo)
         || string.IsNullOrWhiteSpace(request.Descricao))
         return Results.BadRequest("Tarefa inválida.");
 
-    var userId = int.Parse(httpContext.User.FindFirst("UserId")?.Value);
-    
-    tarefaRepository.Adicionar(new Tarefa(request.Titulo, request.Descricao, 0, userId, DateTime.UtcNow));
+    tarefaRepository.Adicionar(new Tarefa(request.Titulo, request.Descricao, 0, userContext.IdUsuarioLogado, DateTime.UtcNow));
     
     return Results.Created();
 }).RequireAuthorization();
 
-app.MapPatch("/tarefas/{id}", (int id, AtualizarTarefaRequest request, HttpContext httpContext, ITarefaRepository  tarefaRepository) =>
+app.MapPatch("/tarefas/{id}", (int id, AtualizarTarefaRequest request, IUserContext userContext, ITarefaRepository  tarefaRepository) =>
 {
     if (string.IsNullOrWhiteSpace(request.Titulo)
         || string.IsNullOrWhiteSpace(request.Descricao))
         return Results.BadRequest("Tarefa inválida.");
 
-    var userId = int.Parse(httpContext.User.FindFirst("UserId")?.Value);
-    
-    var tarefa = tarefaRepository.Buscar(id, userId);
+    var tarefa = tarefaRepository.Buscar(id, userContext.IdUsuarioLogado);
     
     if (tarefa == null)
         return Results.NotFound("Tarefa não cadastrada.");
@@ -124,11 +124,9 @@ app.MapPatch("/tarefas/{id}", (int id, AtualizarTarefaRequest request, HttpConte
     return Results.Ok();
 }).RequireAuthorization();
 
-app.MapDelete("/tarefas/{id}", (int id, HttpContext httpContext, ITarefaRepository  tarefaRepository) =>
+app.MapDelete("/tarefas/{id}", (int id, IUserContext userContext, ITarefaRepository  tarefaRepository) =>
 {
-    var userId = int.Parse(httpContext.User.FindFirst("UserId")?.Value);
-    
-    var tarefa = tarefaRepository.Buscar(id, userId);
+    var tarefa = tarefaRepository.Buscar(id, userContext.IdUsuarioLogado);
     
     if (tarefa == null)
         return Results.NotFound("Tarefa não cadastrada.");
@@ -138,12 +136,9 @@ app.MapDelete("/tarefas/{id}", (int id, HttpContext httpContext, ITarefaReposito
     return Results.NoContent();
 }).RequireAuthorization();
 
-app.MapPatch("/tarefas/{id}/iniciar", (int id, HttpContext httpContext, ITarefaRepository  tarefaRepository) =>
+app.MapPatch("/tarefas/{id}/iniciar", (int id, IUserContext userContext, ITarefaRepository  tarefaRepository) =>
 {
-    var userId = int.Parse(httpContext.User.FindFirst("UserId")?.Value);
-    
-    
-    var tarefa = tarefaRepository.Buscar(id, userId);
+    var tarefa = tarefaRepository.Buscar(id, userContext.IdUsuarioLogado);
     
     if (tarefa == null)
         return Results.NotFound("Tarefa não cadastrada.");
@@ -155,11 +150,9 @@ app.MapPatch("/tarefas/{id}/iniciar", (int id, HttpContext httpContext, ITarefaR
     return Results.NoContent();
 }).RequireAuthorization();
 
-app.MapPatch("/tarefas/{id}/finalizar", (int id, FinalizarTarefaRequest request, HttpContext httpContext, ITarefaRepository tarefaRepository) =>
+app.MapPatch("/tarefas/{id}/finalizar", (int id, FinalizarTarefaRequest request, IUserContext userContext, ITarefaRepository tarefaRepository) =>
 {
-    var userId = int.Parse(httpContext.User.FindFirst("UserId")?.Value);
-
-    var tarefa = tarefaRepository.Buscar(id, userId);
+    var tarefa = tarefaRepository.Buscar(id, userContext.IdUsuarioLogado);
     
     if (tarefa == null)
         return Results.NotFound("Tarefa não cadastrada.");
@@ -171,12 +164,9 @@ app.MapPatch("/tarefas/{id}/finalizar", (int id, FinalizarTarefaRequest request,
     return Results.NoContent();
 }).RequireAuthorization();
 
-app.MapGet("/tarefas", (int? status, HttpContext httpContext, ITarefaRepository tarefaRepository) =>
+app.MapGet("/tarefas", (int? status, IUserContext userContext, ITarefaRepository tarefaRepository) =>
 {
-    var userId = int.Parse(httpContext.User.FindFirst("UserId")?.Value);
-
-    var tarefas = tarefaRepository.Buscar(userId, status);
-    
+    var tarefas = tarefaRepository.Buscar(userContext.IdUsuarioLogado, status);
     return Results.Ok(tarefas);
 }).RequireAuthorization();
 
