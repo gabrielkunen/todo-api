@@ -1,5 +1,6 @@
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
+using System.Text;
 using FluentValidation;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
@@ -30,9 +31,14 @@ builder.Services.AddAuthentication(options =>
         options.SaveToken = true;
         options.TokenValidationParameters = new TokenValidationParameters
         {
-            IssuerSigningKey = new SymmetricSecurityKey("e7477fbd-29f1-4698-8aed-a35276bfe197"u8.ToArray()),
-            ValidateIssuer = false,
-            ValidateAudience = false
+            ValidateIssuerSigningKey = true,
+            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(builder.Configuration["ConfiguracoesJwt:SecretKey"]!)),
+            ValidateIssuer = true,
+            ValidIssuer = builder.Configuration["ConfiguracoesJwt:Issuer"],
+            ValidateAudience = true,
+            ValidAudience = builder.Configuration["ConfiguracoesJwt:Audience"],
+            ValidateLifetime = true,
+            ClockSkew = TimeSpan.Zero
         };
     });
 
@@ -76,7 +82,7 @@ app.MapPost("/autenticacoes", (LoginRequest request, IUsuarioRepository usuarioR
         return Results.BadRequest(new PadraoErroResponse("Senha incorreta."));
     
     var handler = new JwtSecurityTokenHandler();
-    var key = "e7477fbd-29f1-4698-8aed-a35276bfe197"u8.ToArray();
+    var key = Encoding.UTF8.GetBytes(builder.Configuration["ConfiguracoesJwt:SecretKey"]!);
     var credentials = new SigningCredentials(new SymmetricSecurityKey(key), SecurityAlgorithms.HmacSha256Signature);
     
     var ci = new ClaimsIdentity();
@@ -85,8 +91,11 @@ app.MapPost("/autenticacoes", (LoginRequest request, IUsuarioRepository usuarioR
     var tokenDescriptor = new SecurityTokenDescriptor
     {
         Subject = ci,
-        Expires = DateTime.UtcNow.AddHours(2),
-        SigningCredentials = credentials
+        Expires = DateTime.UtcNow.AddSeconds(10),
+        SigningCredentials = credentials,
+        IssuedAt = DateTime.UtcNow,
+        Issuer = builder.Configuration["ConfiguracoesJwt:Issuer"],
+        Audience = builder.Configuration["ConfiguracoesJwt:Audience"]
     };
     var token = handler.CreateToken(tokenDescriptor);
     var tokenFinal = handler.WriteToken(token);
